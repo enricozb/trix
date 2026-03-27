@@ -160,7 +160,7 @@ from trix's Nix flake, and pin tree-sitter grammars as inputs:
       in
       {
         devShells.default = pkgs.mkShell {
-          GRAMMARS = mkGrammarDrvs {
+          GRAMMARS = trix.mkGrammarDrvs.${system} {
             rust = tree-sitter-rust;
             vine = "${tree-sitter-vine}/lsp/tree-sitter-vine";
           };
