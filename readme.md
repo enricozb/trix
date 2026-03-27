@@ -78,8 +78,12 @@ use std::path::PathBuf;
 use trix_build::Macros;
 
 fn main() {
-  let grammar_paths = vec!["./grammars/rust", "./grammars/vine"];
-  let macros = Macros::from_grammar_paths(&grammar_paths).unwrap();
+  let mut trix_config = TrixConfig::default();
+  trix_config.sources.insert(
+    "typescript".into(),
+    Source::new("./grammars/typescript", Some(["typescript", "tsx"])),
+  );
+  let macros = Macros::from_config(&trix_config).unwrap();
   let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
   std::fs::write(out_dir.join("grammars.rs"), macros.to_string()).unwrap();
 }
@@ -139,12 +143,12 @@ from trix's Nix flake, and pin tree-sitter grammars as inputs:
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     trix.url = "github:enricozb/trix";
-    tree-sitter-rust = {
-      url = "github:tree-sitter/tree-sitter-rust";
+    tree-sitter-typescript = {
+      url = "github:tree-sitter/tree-sitter-typescript";
       flake = false;
     };
-    tree-sitter-vine = {
-      url = "github:VineLang/vine";
+    tree-sitter-rust = {
+      url = "github:tree-sitter/tree-sitter-rust";
       flake = false;
     };
   };
@@ -161,8 +165,11 @@ from trix's Nix flake, and pin tree-sitter grammars as inputs:
       {
         devShells.default = pkgs.mkShell {
           GRAMMARS = trix.mkTrixConfig.${system} {
-            rust = tree-sitter-rust;
-            vine = "${tree-sitter-vine}/lsp/tree-sitter-vine";
+            typescript = {
+              src = tree-sitter-typescript;
+              filter = [ "typescript" ];
+            };
+            rust.src = tree-sitter-rust;
           };
         };
       }

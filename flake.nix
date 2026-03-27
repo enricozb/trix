@@ -18,11 +18,10 @@
       url = "github:ram02z/tree-sitter-fish";
       flake = false;
     };
-    tree-sitter-rust = {
-      url = "github:tree-sitter/tree-sitter-rust";
+    tree-sitter-typescript = {
+      url = "github:tree-sitter/tree-sitter-typescript";
       flake = false;
     };
-    vine.url = "github:VineLang/vine";
   };
 
   outputs =
@@ -34,8 +33,7 @@
       treefmt-nix,
 
       tree-sitter-fish,
-      tree-sitter-rust,
-      vine,
+      tree-sitter-typescript,
       ...
     }:
     flake-utils.lib.eachDefaultSystem (
@@ -56,20 +54,30 @@
 
         mkTrixConfig = grammarSrcs: builtins.toJSON (builtins.mapAttrs mkGrammarDrv grammarSrcs);
         mkGrammarDrv =
-          name: src:
-          pkgs.stdenv.mkDerivation {
-            name = "tree-sitter-${name}";
-            inherit src;
+          name:
+          {
+            src,
+            filter ? null,
+          }:
+          let
+            drv = pkgs.stdenv.mkDerivation {
+              name = "tree-sitter-${name}";
+              inherit src;
 
-            nativeBuildInputs = [
-              pkgs.nushell
-              pkgs.tree-sitter
-              pkgs.nodejs_24
-            ];
+              nativeBuildInputs = [
+                pkgs.nushell
+                pkgs.tree-sitter
+                pkgs.nodejs_24
+              ];
 
-            configurePhase = ''echo "skipping configure"'';
-            buildPhase = ''nu ${./build.nu} --build "${name}"'';
-            installPhase = "nu ${./build.nu} --install";
+              configurePhase = ''echo "skipping configure"'';
+              buildPhase = ''nu ${./build.nu} --build "${name}"'';
+              installPhase = "nu ${./build.nu} --install";
+            };
+          in
+          {
+            src = drv;
+            inherit filter;
           };
       in
       {
@@ -77,9 +85,11 @@
 
         devShells.default = craneLib.devShell {
           GRAMMARS = mkTrixConfig {
-            fish = tree-sitter-fish;
-            rust = tree-sitter-rust;
-            vine = vine.packages.${system}.tree-sitter-vine;
+            fish.src = tree-sitter-fish;
+            typescript = {
+              src = tree-sitter-typescript;
+              filter = [ "typescript" ];
+            };
           };
         };
 

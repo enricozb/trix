@@ -2,7 +2,7 @@ pub mod error;
 
 use std::{
   borrow::Cow,
-  collections::HashMap,
+  collections::{HashMap, HashSet},
   fmt::Display,
   path::{Path, PathBuf},
 };
@@ -91,14 +91,14 @@ impl Macros {
   pub fn from_config(trix_config: &TrixConfig) -> Result<Macros> {
     let mut mods: Vec<ItemMod> = Vec::new();
     let mut grammars = Vec::new();
-    for (grammar_name, grammar_dir) in &trix_config.grammar_paths {
+    for (name, source) in &trix_config.sources {
       let tree_sitter_config =
-        TreeSitterConfig::from_dir(grammar_dir).unwrap_or_else(|_| TreeSitterConfig::from_name(grammar_name.clone()));
+        TreeSitterConfig::from_source(source).unwrap_or_else(|_| TreeSitterConfig::from_name(name.clone()));
       for grammar in tree_sitter_config.grammars {
         let Grammar { path, name, .. } = &grammar;
         let grammar_path = match path {
-          Some(path) => grammar_dir.join(path),
-          None => grammar_dir.clone(),
+          Some(path) => source.src.join(path),
+          None => source.src.clone(),
         };
 
         let mut build = cc::Build::new();
@@ -219,15 +219,30 @@ impl Display for Macros {
   }
 }
 
-#[derive(Deserialize)]
+#[derive(Default, Deserialize)]
 pub struct TrixConfig {
   #[serde(flatten)]
-  pub grammar_paths: HashMap<String, PathBuf>,
+  pub sources: HashMap<String, Source>,
 }
 
 impl TrixConfig {
   pub fn from_json<S: AsRef<str>>(s: S) -> Result<Self> {
     Ok(serde_json::from_str(s.as_ref())?)
+  }
+}
+
+#[derive(Deserialize)]
+pub struct Source {
+  pub src: PathBuf,
+  pub filter: Option<HashSet<String>>,
+}
+
+impl Source {
+  pub fn new<P: AsRef<Path>>(src: P, filter: Option<impl IntoIterator<Item = impl Display>>) -> Self {
+    Self {
+      src: src.as_ref().to_owned(),
+      filter: filter.map(|filter| filter.into_iter().map(|s| format!("{s}")).collect()),
+    }
   }
 }
 
@@ -239,14 +254,19 @@ struct TreeSitterConfig {
 impl TreeSitterConfig {
   /// Recursively searches ancestors of `dir` for a `tree-sitter.json`,
   /// and uses it to deserialize into `Self`.
-  fn from_dir(mut dir: &Path) -> Result<Self> {
+  fn from_source(source: &Source) -> Result<Self> {
+    let mut dir = source.src.as_path();
     let mut tree_sitter_json_path = dir.join("tree-sitter.json");
     while !tree_sitter_json_path.exists() {
       dir = dir.parent().ok_or(Error::NoParent)?;
       tree_sitter_json_path = dir.join("tree-sitter.json");
     }
     let json = std::fs::read_to_string(tree_sitter_json_path)?;
-    Ok(serde_json::from_str(&json)?)
+    let mut config: Self = serde_json::from_str(&json)?;
+    if let Some(filter) = &source.filter {
+      config.grammars.retain(|g| filter.contains(&g.name));
+    }
+    Ok(config)
   }
 
   /// Generates an inferred version of a `tree-sitter.json` from the `name` of

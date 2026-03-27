@@ -8,23 +8,23 @@ mod tests {
   #[test]
   fn module() {
     grammars_mod!(pub mod grammars);
-    let rust = grammars::rust::language();
-    assert!(format!("{rust:?}").starts_with("Language("));
+    let typescript = grammars::typescript::language();
+    assert!(format!("{typescript:?}").starts_with("Language("));
   }
 
   #[test]
   fn languages_vis() {
     languages!(enum Language);
-    let x = Language::Rust;
-    assert!(matches!(x, Language::Rust));
+    let x = Language::TypeScript;
+    assert!(matches!(x, Language::TypeScript));
   }
 
   #[test]
   fn languages_attrs() {
     languages!(#[derive(Clone, Copy, Debug)] pub enum Language);
-    let x = Language::Rust;
+    let x = Language::TypeScript;
     let y = x;
-    assert_eq!(format!("{x:?} {y:?}"), "Rust Rust");
+    assert_eq!(format!("{x:?} {y:?}"), "TypeScript TypeScript");
   }
 
   #[test]
@@ -37,19 +37,18 @@ mod tests {
       fn as_tree_sitter_language() {}
     }
 
-    let x = Language::Rust;
-    assert!(matches!(x, Language::Rust));
+    let x = Language::TypeScript;
+    assert!(matches!(x, Language::TypeScript));
   }
 
   #[test]
   fn languages_impl() {
     enum Language {
       Fish,
-      Rust,
-      Vine,
+      TypeScript,
     }
     languages_impl!(Language);
-    let rust = Language::Rust.as_tree_sitter_language();
-    assert!(format!("{rust:?}").starts_with("Language("));
+    let typescript = Language::TypeScript.as_tree_sitter_language();
+    assert!(format!("{typescript:?}").starts_with("Language("));
   }
 }
