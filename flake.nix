@@ -62,44 +62,14 @@
             inherit src;
 
             nativeBuildInputs = [
-              pkgs.jq
+              pkgs.nushell
               pkgs.tree-sitter
               pkgs.nodejs_24
             ];
 
-            configurePhase = ''
-              echo 'skipping configure'
-            '';
-
-            # - if `tree-sitter.json` does not exist, we fake a minimal one with
-            #   `name` and `metadata` fields.
-            # - if `grammar.js` doesn't exist for a grammar, we assume
-            #   `tree-sitter generate` has already been executed for it.
-            # - if `parser.c` already exists for a grammar, we do not execute
-            #   to run `tree-sitter generate`.
-            buildPhase = ''
-              if ! [ -f tree-sitter.json ]; then
-                echo '{ "name": "${name}", "metadata": { "version": "0.0.0" } }' > tree-sitter.json
-              fi
-
-              local grammar_paths=$(jq '.grammars? // [{path:"."}] | .[] | .path // "."' tree-sitter.json -r)
-              for grammar_path in $grammar_paths; do
-                if [ -f "$grammar_path/grammar.js" ] && ! [ -f "$grammar_path/src/parser.c" ]; then
-                  tree-sitter generate "$grammar_path/grammar.js"
-                fi
-              done
-            '';
-
-            installPhase = ''
-              mkdir $out
-              cp tree-sitter.json $out
-
-              local grammar_paths=$(jq '.grammars? // [{path:"."}] | .[] | .path // "."' tree-sitter.json -r)
-              for grammar_path in $grammar_paths; do
-                mkdir -p "$out/$grammar_path"
-                cp -r "$grammar_path/src" "$out/$grammar_path"
-              done
-            '';
+            configurePhase = ''echo "skipping configure"'';
+            buildPhase = ''nu ${./build.nu} --build "${name}"'';
+            installPhase = "nu ${./build.nu} --install";
           };
       in
       {

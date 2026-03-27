@@ -172,7 +172,6 @@ from trix's Nix flake, and pin tree-sitter grammars as inputs:
 The `GRAMMARS` environment variable above is json string which can be
 deserialized into a `TrixConfig`:
 ```rust
-
 use trix_build::{Macros, TrixConfig};
 
 fn main() {
