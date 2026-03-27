@@ -1,6 +1,8 @@
 pub mod error;
 
 use std::{
+  borrow::Cow,
+  collections::HashMap,
   fmt::Display,
   path::{Path, PathBuf},
 };
@@ -70,34 +72,33 @@ pub struct Macros {
   /// ```ignore
   /// languages_decl!($(#[$meta:meta])* $vis:vis enum $name:ident);
   /// ```
-  /// Which expands just to the type declaration portion of `Self::languages`.
+  /// Which expands just to the type declaration portion of [`Self::languages`].
   pub languages_decl: ItemMacro,
 
   /// A macro invoked like:
   /// ```ignore
   /// languages_impl!($name:ident);
   /// ```
-  /// Which expands just to the implementation portion of `Self::languages`.
+  /// Which expands just to the implementation portion of [`Self::languages`].
   pub languages_impl: ItemMacro,
 }
 
 impl Macros {
-  /// Generates macros from paths to tree-sitter grammars. Each path must
-  /// contain the outputs of `tree-sitter generate`. Each path may specify
-  /// multiple grammars in its `tree-sitter.json`. If a `tree-sitter.json` is
-  /// not found in a path, its ancestors are searched.
-  pub fn from_grammar_paths(grammar_paths: &[PathBuf]) -> Result<Macros> {
+  /// Generates macros from paths to tree-sitter grammars. These paths should
+  /// contain a `tree-sitter.json`, but if they don't, the parts of its contents
+  /// which are relevant to `trix` are inferred from the name of the grammar
+  /// alone. See [`TreeSitterConfig::from_name`].
+  pub fn from_config(trix_config: &TrixConfig) -> Result<Macros> {
     let mut mods: Vec<ItemMod> = Vec::new();
     let mut grammars = Vec::new();
-    for grammar_path in grammar_paths {
-      let tree_sitter_json = tree_sitter_json(grammar_path)?;
-
-      let tree_sitter_config: TreeSitterConfig = serde_json::from_str(&tree_sitter_json)?;
+    for (grammar_name, grammar_dir) in &trix_config.grammar_paths {
+      let tree_sitter_config =
+        TreeSitterConfig::from_dir(grammar_dir).unwrap_or_else(|_| TreeSitterConfig::from_name(grammar_name.clone()));
       for grammar in tree_sitter_config.grammars {
         let Grammar { path, name, .. } = &grammar;
         let grammar_path = match path {
-          Some(path) => grammar_path.join(path),
-          None => grammar_path.clone(),
+          Some(path) => grammar_dir.join(path),
+          None => grammar_dir.clone(),
         };
 
         let mut build = cc::Build::new();
@@ -131,16 +132,14 @@ impl Macros {
       }
     }
 
-    let variants = grammars
-      .iter()
-      .map(|g| format_ident!("{}", g.camelcase.as_ref().unwrap_or(&g.name).as_str()));
+    let variants = grammars.iter().map(|g| format_ident!("{}", g.camelcase()));
     let arms = grammars.iter().map(|g| -> Arm {
       let fn_ident = format_ident!("tree_sitter_{}", g.name);
-      let variant = format_ident!("{}", g.camelcase.as_ref().unwrap_or(&g.name));
+      let variant = format_ident!("{}", g.camelcase());
       parse_quote! {
         Language::#variant => {
-            unsafe extern "C" { fn #fn_ident() -> tree_sitter::Language; }
-            unsafe { #fn_ident() }
+          unsafe extern "C" { fn #fn_ident() -> tree_sitter::Language; }
+          unsafe { #fn_ident() }
         }
       }
     });
@@ -221,8 +220,45 @@ impl Display for Macros {
 }
 
 #[derive(Deserialize)]
+pub struct TrixConfig {
+  #[serde(flatten)]
+  pub grammar_paths: HashMap<String, PathBuf>,
+}
+
+impl TrixConfig {
+  pub fn from_json<S: AsRef<str>>(s: S) -> Result<Self> {
+    Ok(serde_json::from_str(s.as_ref())?)
+  }
+}
+
+#[derive(Deserialize)]
 struct TreeSitterConfig {
   grammars: Vec<Grammar>,
+}
+
+impl TreeSitterConfig {
+  /// Recursively searches ancestors of `dir` for a `tree-sitter.json`,
+  /// and uses it to deserialize into `Self`.
+  fn from_dir(mut dir: &Path) -> Result<Self> {
+    let mut tree_sitter_json_path = dir.join("tree-sitter.json");
+    while !tree_sitter_json_path.exists() {
+      dir = dir.parent().ok_or(Error::NoParent)?;
+      tree_sitter_json_path = dir.join("tree-sitter.json");
+    }
+    let json = std::fs::read_to_string(tree_sitter_json_path)?;
+    Ok(serde_json::from_str(&json)?)
+  }
+
+  /// Generates an inferred version of a `tree-sitter.json` from the `name` of
+  /// a grammar. Specifically, a single grammar is inferred with:
+  /// - a `name` of `name`
+  /// - a `camelcase` of `name` with the first letter capitalized
+  /// - a `path` of `.`
+  fn from_name(name: String) -> Self {
+    Self {
+      grammars: vec![Grammar::from_name(name)],
+    }
+  }
 }
 
 #[derive(Clone, Deserialize)]
@@ -232,11 +268,29 @@ struct Grammar {
   camelcase: Option<String>,
 }
 
-fn tree_sitter_json(mut grammar_path: &Path) -> Result<String> {
-  let mut tree_sitter_json_path = grammar_path.join("tree-sitter.json");
-  while !tree_sitter_json_path.exists() {
-    grammar_path = grammar_path.parent().ok_or(Error::NoParent)?;
-    tree_sitter_json_path = grammar_path.join("tree-sitter.json");
+impl Grammar {
+  fn from_name(name: String) -> Self {
+    Self {
+      camelcase: Some(capitalize(&name).into_owned()),
+      name,
+      path: None,
+    }
   }
-  Ok(std::fs::read_to_string(tree_sitter_json_path)?)
+
+  fn camelcase(&self) -> String {
+    self
+      .camelcase
+      .clone()
+      .unwrap_or_else(|| capitalize(&self.name).into_owned())
+  }
+}
+
+fn capitalize<'a>(s: &'a str) -> Cow<'a, str> {
+  let mut i = s.chars();
+  let Some(c) = i.next() else { return Cow::Borrowed("") };
+  if c.is_uppercase() {
+    Cow::Borrowed(s)
+  } else {
+    Cow::Owned(format!("{}{}", c.to_uppercase(), i.collect::<String>()))
+  }
 }

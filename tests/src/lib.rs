@@ -3,6 +3,7 @@
 include!(concat!(env!("OUT_DIR"), "/", "grammars.rs"));
 
 #[cfg(test)]
+#[allow(unused)]
 mod tests {
   #[test]
   fn module() {
@@ -33,7 +34,6 @@ mod tests {
     // If this compiles, then `as_tree_sitter_language` is not being generated,
     // which is the desired behavior when using `languages_decl!`.
     impl Language {
-      #[allow(unused)]
       fn as_tree_sitter_language() {}
     }
 
@@ -44,7 +44,9 @@ mod tests {
   #[test]
   fn languages_impl() {
     enum Language {
+      Fish,
       Rust,
+      Vine,
     }
     languages_impl!(Language);
     let rust = Language::Rust.as_tree_sitter_language();

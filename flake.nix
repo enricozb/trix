@@ -12,6 +12,17 @@
       url = "github:numtide/treefmt-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # included as it does not include a tree-sitter.json
+    tree-sitter-fish = {
+      url = "github:ram02z/tree-sitter-fish";
+      flake = false;
+    };
+    tree-sitter-rust = {
+      url = "github:tree-sitter/tree-sitter-rust";
+      flake = false;
+    };
+    vine.url = "github:VineLang/vine";
   };
 
   outputs =
@@ -21,6 +32,10 @@
       rust-overlay,
       crane,
       treefmt-nix,
+
+      tree-sitter-fish,
+      tree-sitter-rust,
+      vine,
       ...
     }:
     flake-utils.lib.eachDefaultSystem (
@@ -39,34 +54,46 @@
           programs.rustfmt.enable = true;
         };
 
-        mkGrammarDrvs =
-          grammarSrcs: builtins.concatStringsSep ":" (pkgs.lib.mapAttrsToList mkGrammarDrv grammarSrcs);
+        mkTrixConfig = grammarSrcs: builtins.toJSON (builtins.mapAttrs mkGrammarDrv grammarSrcs);
         mkGrammarDrv =
           name: src:
           pkgs.stdenv.mkDerivation {
             name = "tree-sitter-${name}";
             inherit src;
+
             nativeBuildInputs = [
               pkgs.jq
               pkgs.tree-sitter
               pkgs.nodejs_24
             ];
+
             configurePhase = ''
               echo 'skipping configure'
             '';
+
+            # - if `tree-sitter.json` does not exist, we fake a minimal one with
+            #   `name` and `metadata` fields.
+            # - if `grammar.js` doesn't exist for a grammar, we assume
+            #   `tree-sitter generate` has already been executed for it.
             buildPhase = ''
-              for grammar_path in $(jq '.grammars[].path // "."' tree-sitter.json -r); do
-                tree-sitter generate "$grammar_path/grammar.js"
+              if ! [ -f tree-sitter.json ]; then
+                echo '{ "name": "${name}", "metadata": { "version": "0.0.0" } }' > tree-sitter.json
+              fi
+
+              local grammar_paths=$(jq '.grammars? // [{path:"."}] | .[] | .path // "."' tree-sitter.json -r)
+              for grammar_path in $grammar_paths; do
+                if [ -f "$grammar_path/grammar.js" ]; then
+                  tree-sitter generate "$grammar_path/grammar.js"
+                fi
               done
             '';
+
             installPhase = ''
               mkdir $out
               cp tree-sitter.json $out
 
-              for grammar_path in $(jq '.grammars[].path // "."' tree-sitter.json -r); do
-                echo checking $grammar_path
-
-                ls "$grammar_path"
+              local grammar_paths=$(jq '.grammars? // [{path:"."}] | .[] | .path // "."' tree-sitter.json -r)
+              for grammar_path in $grammar_paths; do
                 mkdir -p "$out/$grammar_path"
                 cp -r "$grammar_path/src" "$out/$grammar_path"
               done
@@ -74,11 +101,13 @@
           };
       in
       {
-        inherit mkGrammarDrvs;
+        inherit mkTrixConfig;
 
         devShells.default = craneLib.devShell {
-          GRAMMARS = mkGrammarDrvs {
-            rust = ./tests/grammar;
+          GRAMMARS = mkTrixConfig {
+            fish = tree-sitter-fish;
+            rust = tree-sitter-rust;
+            vine = vine.packages.${system}.tree-sitter-vine;
           };
         };
 

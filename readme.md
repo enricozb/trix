@@ -132,7 +132,7 @@ you how this is done, but `trix` also has a Nix flake which can facilitate this.
 
 ## Usage - Nix
 
-To avoid checking in tree-sitter grammars at all, you can use `mkGrammarDrvs`
+To avoid checking in tree-sitter grammars at all, you can use `mkTrixConfig`
 from trix's Nix flake, and pin tree-sitter grammars as inputs:
 ```nix
 {
@@ -160,7 +160,7 @@ from trix's Nix flake, and pin tree-sitter grammars as inputs:
       in
       {
         devShells.default = pkgs.mkShell {
-          GRAMMARS = trix.mkGrammarDrvs.${system} {
+          GRAMMARS = trix.mkTrixConfig.${system} {
             rust = tree-sitter-rust;
             vine = "${tree-sitter-vine}/lsp/tree-sitter-vine";
           };
@@ -169,15 +169,24 @@ from trix's Nix flake, and pin tree-sitter grammars as inputs:
     );
 }
 ```
-The `GRAMMARS` environment variable above is a `:`-delimited list of paths
-to grammars which can be passed to `Macros::from_grammar_paths`:
+The `GRAMMARS` environment variable above is json string which can be
+deserialized into a `TrixConfig`:
 ```rust
+
+use trix_build::{Macros, TrixConfig};
+
 fn main() {
   println!("cargo:rerun-if-env-changed=GRAMMARS");
-  let grammar_paths = std::env::var("GRAMMARS").unwrap();
-  let grammar_paths: Vec<_> = grammar_paths.split(":").map(PathBuf::from).collect();
-  let macros = Macros::from_grammar_paths(&grammar_paths).unwrap();
+  let grammars_json = std::env::var("GRAMMARS").unwrap();
+  let config = TrixConfig::from_json(&grammars_json).unwrap();
+  let macros = Macros::from_config(&config).unwrap();
   let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
   std::fs::write(out_dir.join("grammars.rs"), macros.to_string()).unwrap();
 }
 ```
+
+A few notes about `mkTrixConfig`:
+- if `tree-sitter.json` does not exist, we fake a minimal one with `name` and
+  `metadata` fields.
+- if `grammar.js` doesn't exist for a grammar, we assume `tree-sitter generate`
+  has already been executed for it.
