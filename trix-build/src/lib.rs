@@ -5,41 +5,75 @@ use std::{
   path::{Path, PathBuf},
 };
 
-use indoc::formatdoc;
+use quote::format_ident;
 use serde::Deserialize;
+use syn::{Arm, ItemMacro, ItemMod, parse_quote};
 
 use crate::error::{Error, Result};
 
-#[derive(Deserialize)]
-pub struct TreeSitterConfig {
-  grammars: Vec<Grammar>,
-}
-
-#[derive(Clone, Deserialize)]
-pub struct Grammar {
-  name: String,
-  path: Option<PathBuf>,
-  camelcase: Option<String>,
-}
-
-pub fn tree_sitter_json(mut grammar_path: &Path) -> Result<String> {
-  let mut tree_sitter_json_path = grammar_path.join("tree-sitter.json");
-  while !tree_sitter_json_path.exists() {
-    grammar_path = grammar_path.parent().ok_or(Error::NoParent)?;
-    tree_sitter_json_path = grammar_path.join("tree-sitter.json");
-  }
-  Ok(std::fs::read_to_string(tree_sitter_json_path)?)
-}
-
+/// Macros to generate Rust code containing tree-sitter grammars.
 pub struct Macros {
-  pub grammars_mod: String,
-  pub languages: String,
+  /// A macro invoked like:
+  /// ```ignore
+  /// grammars_mod!(<token trees>);
+  /// ```
+  /// Which expands to a module declaration where each grammar is a submodule:
+  /// ```ignore
+  /// <token trees> {
+  ///   pub mod rust {
+  ///     unsafe extern "C" { fn tree_sitter_rust() -> tree_sitter::Language; }
+  ///     pub fn language() -> tree_sitter::Language { unsafe { tree_sitter_rust() } }
+  ///   }
+  ///
+  ///   pub mod vine {
+  ///     unsafe extern "C" { fn tree_sitter_vine() -> tree_sitter::Language; }
+  ///     pub fn language() -> tree_sitter::Language { unsafe { tree_sitter_vine() } }
+  ///   }
+  ///
+  ///   // ..
+  /// }
+  /// ```
+  /// The input to the macro should describe how to declare the module, e.g.
+  /// ```ignore
+  /// grammars_mod!(pub mod grammars);
+  /// ```
+  pub grammars_mod: ItemMacro,
+
+  /// A macro invoked like:
+  /// ```ignore
+  /// languages!($(#[$meta:meta])* $vis:vis enum $name:ident);
+  /// ```
+  /// Which expands to a type declaration where each grammar is a variant:
+  /// ```ignore
+  /// $(#[$meta])* $vis enum $name {
+  ///   Rust,
+  ///   Vine,
+  ///   // ..
+  /// }
+  ///
+  /// impl $name {
+  ///   pub fn as_tree_sitter_language(self) -> tree_sitter::Language {
+  ///     match self {
+  ///       Language::Rust => tree_sitter_rust::language()
+  ///       Language::Vine => tree_sitter_vine::language()
+  ///     }
+  ///   }
+  /// }
+  /// ```
+  /// The input to the macro should describe how to declare the type, e.g.
+  /// ```ignore
+  /// languages!(#[derive(Clone, Copy, Debug)] pub mod Languages);
+  /// ```
+  pub languages: ItemMacro,
 }
 
 impl Macros {
+  /// Generates macros from paths to tree-sitter grammars. Each path must
+  /// contain the outputs of `tree-sitter generate`. Each path may specify
+  /// multiple grammars in its `tree-sitter.json`. If a `tree-sitter.json` is
+  /// not found in a path, its ancestors are searched.
   pub fn from_grammar_paths(grammar_paths: &[PathBuf]) -> Result<Macros> {
-    let mut mods = Vec::new();
-
+    let mut mods: Vec<ItemMod> = Vec::new();
     let mut grammars = Vec::new();
     for grammar_path in grammar_paths {
       let tree_sitter_json = tree_sitter_json(grammar_path)?;
@@ -69,72 +103,63 @@ impl Macros {
         }
         build.compile(&format!("tree-sitter-{name}"));
 
-        mods.push(formatdoc!(
-          r#"
-            pub mod {name} {{
-              unsafe extern "C" {{ fn tree_sitter_{name}() -> tree_sitter::Language; }}
+        let mod_ident = format_ident!("{}", name);
+        let fn_ident = format_ident!("tree_sitter_{}", name);
+        mods.push(parse_quote! {
+          #[allow(unused)]
+          pub mod #mod_ident {
+            unsafe extern "C" { fn #fn_ident() -> tree_sitter::Language; }
 
-              pub fn language() -> tree_sitter::Language {{ unsafe {{ tree_sitter_{name}() }} }}
-            }}
-          "#,
-        ));
+            pub fn language() -> tree_sitter::Language { unsafe { #fn_ident() } }
+          }
+        });
         grammars.push(grammar.clone());
       }
     }
 
-    let mods = mods.join("\n");
-    let languages = grammars
+    let variants = grammars
       .iter()
-      .map(|g| g.camelcase.as_ref().unwrap_or(&g.name).as_str())
-      .collect::<Vec<_>>()
-      .join(",\n");
-    let matches = grammars
-      .iter()
-      .map(|g| {
-        format!(
-          r#"Language::{camelcase} => {{
-            unsafe extern "C" {{ fn tree_sitter_{name}() -> tree_sitter::Language; }}
-            unsafe {{ tree_sitter_{name}() }}
-          }}"#,
-          camelcase = g.camelcase.as_ref().unwrap_or(&g.name),
-          name = g.name,
-        )
-      })
-      .collect::<Vec<_>>()
-      .join(",\n");
+      .map(|g| format_ident!("{}", g.camelcase.as_ref().unwrap_or(&g.name).as_str()));
+    let arms = grammars.iter().map(|g| -> Arm {
+      let fn_ident = format_ident!("tree_sitter_{}", g.name);
+      let variant = format_ident!("{}", g.camelcase.as_ref().unwrap_or(&g.name));
+      parse_quote! {
+        Language::#variant => {
+            unsafe extern "C" { fn #fn_ident() -> tree_sitter::Language; }
+            unsafe { #fn_ident() }
+        }
+      }
+    });
 
-    let grammars_mod = formatdoc!(
-      "
+    let grammars_mod = parse_quote! {
       #[allow(unused)]
-      macro_rules! grammars_mod {{
-        ($($decl:tt)*) => {{
-          $($decl)* {{
-            {mods}
-          }}
-        }}
-      }}
-    "
-    );
-    let languages = formatdoc!(
-      "
+      macro_rules! grammars_mod {
+        ($($decl:tt)*) => {
+          $($decl)* {
+            #(#mods)*
+          }
+        }
+      }
+    };
+    let languages = parse_quote! {
       #[allow(unused)]
-      macro_rules! languages {{
-        ($($decl:tt)*) => {{
-          $($decl)* {{
-            {languages}
-          }}
+      macro_rules! languages {
+        ($(#[$meta:meta])* $vis:vis enum $name:ident) => {
+          $(#[$meta])* $vis enum $name {
+            #(#variants,)*
+          }
 
-          impl Language {{
-            pub fn as_tree_sitter_language(self) -> tree_sitter::Language {{
-              match self {{
-                {matches}
-              }}
-            }}
-          }}
-        }};
-      }}
-    "
-    );
+          #[allow(unused)]
+          impl $name {
+            pub fn as_tree_sitter_language(self) -> tree_sitter::Language {
+              match self {
+                #(#arms)*
+              }
+            }
+          }
+        };
+      }
+    };
 
     Ok(Macros {
       grammars_mod,
@@ -145,6 +170,36 @@ impl Macros {
 
 impl Display for Macros {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}\n\n{}", self.grammars_mod, self.languages)
+    let Self {
+      grammars_mod,
+      languages,
+    } = self;
+    let file = parse_quote! {
+      #grammars_mod
+      #languages
+    };
+    let pretty = prettyplease::unparse(&file);
+    write!(f, "{}", pretty)
   }
+}
+
+#[derive(Deserialize)]
+struct TreeSitterConfig {
+  grammars: Vec<Grammar>,
+}
+
+#[derive(Clone, Deserialize)]
+struct Grammar {
+  name: String,
+  path: Option<PathBuf>,
+  camelcase: Option<String>,
+}
+
+fn tree_sitter_json(mut grammar_path: &Path) -> Result<String> {
+  let mut tree_sitter_json_path = grammar_path.join("tree-sitter.json");
+  while !tree_sitter_json_path.exists() {
+    grammar_path = grammar_path.parent().ok_or(Error::NoParent)?;
+    tree_sitter_json_path = grammar_path.join("tree-sitter.json");
+  }
+  Ok(std::fs::read_to_string(tree_sitter_json_path)?)
 }

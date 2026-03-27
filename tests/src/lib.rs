@@ -3,8 +3,9 @@
 
 include!(concat!(env!("OUT_DIR"), "/", "grammars.rs"));
 
+/// This should fail as `Languages` does not implement `Debug`.
 /// ```compile_fail
-/// languages!(mod grammars);
+/// languages!(pub enum Languages);
 ///
 /// eprintln!("{:?}", Language::Rust);
 /// ```
@@ -17,6 +18,13 @@ mod tests {
     grammars_mod!(pub mod grammars);
     let rust = grammars::rust::language();
     assert!(format!("{rust:?}").starts_with("Language("));
+  }
+
+  #[test]
+  fn vis() {
+    languages!(enum Language);
+    let x = Language::Rust;
+    assert!(matches!(x, Language::Rust));
   }
 
   #[test]

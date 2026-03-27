@@ -1,7 +1,7 @@
 [package]
 name = "trix-build"
 description = "ergonomic code generation for aggregating tree-sitter languages"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "CC0-1.0"
 repository = "https://github.com/enricozb/trix"
@@ -9,7 +9,9 @@ readme = "../readme.md"
 
 [dependencies]
 cc = "1.0"
-indoc = "2.0"
+prettyplease = "0.2"
+quote = "1.0"
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
+syn = { version = "2.0", features = ["full"] }
 thiserror = "2.0"
