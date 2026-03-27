@@ -65,6 +65,20 @@ pub struct Macros {
   /// languages!(#[derive(Clone, Copy, Debug)] pub mod Languages);
   /// ```
   pub languages: ItemMacro,
+
+  /// A macro invoked like:
+  /// ```ignore
+  /// languages_decl!($(#[$meta:meta])* $vis:vis enum $name:ident);
+  /// ```
+  /// Which expands just to the type declaration portion of `Self::languages`.
+  pub languages_decl: ItemMacro,
+
+  /// A macro invoked like:
+  /// ```ignore
+  /// languages_impl!($name:ident);
+  /// ```
+  /// Which expands just to the implementation portion of `Self::languages`.
+  pub languages_impl: ItemMacro,
 }
 
 impl Macros {
@@ -141,14 +155,21 @@ impl Macros {
         }
       }
     };
-    let languages = parse_quote! {
+    let languages_decl = parse_quote! {
       #[allow(unused)]
-      macro_rules! languages {
+      macro_rules! languages_decl {
         ($(#[$meta:meta])* $vis:vis enum $name:ident) => {
           $(#[$meta])* $vis enum $name {
             #(#variants,)*
           }
+        }
+      }
+    };
 
+    let languages_impl = parse_quote! {
+      #[allow(unused)]
+      macro_rules! languages_impl {
+        ($name:ident) => {
           #[allow(unused)]
           impl $name {
             pub fn as_tree_sitter_language(self) -> tree_sitter::Language {
@@ -161,9 +182,21 @@ impl Macros {
       }
     };
 
+    let languages = parse_quote! {
+      #[allow(unused)]
+      macro_rules! languages {
+        ($(#[$meta:meta])* $vis:vis enum $name:ident) => {
+          languages_decl!($(#[$meta])* $vis enum $name);
+          languages_impl!($name);
+        };
+      }
+    };
+
     Ok(Macros {
       grammars_mod,
       languages,
+      languages_decl,
+      languages_impl,
     })
   }
 }
@@ -173,10 +206,14 @@ impl Display for Macros {
     let Self {
       grammars_mod,
       languages,
+      languages_decl,
+      languages_impl,
     } = self;
     let file = parse_quote! {
       #grammars_mod
       #languages
+      #languages_decl
+      #languages_impl
     };
     let pretty = prettyplease::unparse(&file);
     write!(f, "{}", pretty)

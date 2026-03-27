@@ -1,15 +1,6 @@
-//! A crate demonstrating an example use of trix, and also containing tests,
-//! some of which are done rather hackily through doctests' `compile_fail`.
+//! A crate demonstrating an example use of trix, and some tests
 
 include!(concat!(env!("OUT_DIR"), "/", "grammars.rs"));
-
-/// This should fail as `Languages` does not implement `Debug`.
-/// ```compile_fail
-/// languages!(pub enum Languages);
-///
-/// eprintln!("{:?}", Language::Rust);
-/// ```
-pub fn empty_attrs() {}
 
 #[cfg(test)]
 mod tests {
@@ -21,17 +12,42 @@ mod tests {
   }
 
   #[test]
-  fn vis() {
+  fn languages_vis() {
     languages!(enum Language);
     let x = Language::Rust;
     assert!(matches!(x, Language::Rust));
   }
 
   #[test]
-  fn attrs() {
+  fn languages_attrs() {
     languages!(#[derive(Clone, Copy, Debug)] pub enum Language);
     let x = Language::Rust;
     let y = x;
     assert_eq!(format!("{x:?} {y:?}"), "Rust Rust");
+  }
+
+  #[test]
+  fn languages_decl() {
+    languages_decl!(enum Language);
+
+    // If this compiles, then `as_tree_sitter_language` is not being generated,
+    // which is the desired behavior when using `languages_decl!`.
+    impl Language {
+      #[allow(unused)]
+      fn as_tree_sitter_language() {}
+    }
+
+    let x = Language::Rust;
+    assert!(matches!(x, Language::Rust));
+  }
+
+  #[test]
+  fn languages_impl() {
+    enum Language {
+      Rust,
+    }
+    languages_impl!(Language);
+    let rust = Language::Rust.as_tree_sitter_language();
+    assert!(format!("{rust:?}").starts_with("Language("));
   }
 }
