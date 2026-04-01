@@ -136,8 +136,8 @@ you how this is done, but `trix` also has a Nix flake which can facilitate this.
 
 ## Usage - Nix
 
-To avoid checking in tree-sitter grammars at all, you can use `mkTrixConfig`
-from trix's Nix flake, and pin tree-sitter grammars as inputs:
+To avoid checking in tree-sitter grammars at all, you can use `mkConfig` from
+trix's Nix flake, and pin tree-sitter grammars as inputs:
 ```nix
 {
   inputs = {
@@ -164,7 +164,7 @@ from trix's Nix flake, and pin tree-sitter grammars as inputs:
       in
       {
         devShells.default = pkgs.mkShell {
-          GRAMMARS = trix.mkTrixConfig.${system} {
+          TRIX_CONFIG_JSON = trix.mkConfig.${system} {
             typescript = {
               src = tree-sitter-typescript;
               filter = [ "typescript" ];
@@ -176,14 +176,14 @@ from trix's Nix flake, and pin tree-sitter grammars as inputs:
     );
 }
 ```
-The `GRAMMARS` environment variable above is json string which can be
+The `TRIX_CONFIG_JSON` environment variable above is json string which can be
 deserialized into a `TrixConfig`:
 ```rust
 use trix_build::{Macros, TrixConfig};
 
 fn main() {
-  println!("cargo:rerun-if-env-changed=GRAMMARS");
-  let grammars_json = std::env::var("GRAMMARS").unwrap();
+  println!("cargo:rerun-if-env-changed=TRIX_CONFIG_JSON");
+  let grammars_json = std::env::var("TRIX_CONFIG_JSON").unwrap();
   let config = TrixConfig::from_json(&grammars_json).unwrap();
   let macros = Macros::from_config(&config).unwrap();
   let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
@@ -191,7 +191,7 @@ fn main() {
 }
 ```
 
-A few notes about `mkTrixConfig`:
+A few notes about `mkConfig`:
 - if `tree-sitter.json` does not exist, we fake a minimal one with `name` and
   `metadata` fields.
 - if `grammar.js` doesn't exist for a grammar, we assume `tree-sitter generate`

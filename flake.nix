@@ -18,7 +18,7 @@
           inherit system;
         };
 
-        mkTrixConfig = grammarSrcs: builtins.toJSON (builtins.mapAttrs mkGrammarDrv grammarSrcs);
+        mkConfig = grammarSrcs: builtins.toJSON (builtins.mapAttrs mkGrammarDrv grammarSrcs);
         mkGrammarDrv =
           name:
           {
@@ -47,7 +47,7 @@
           };
       in
       {
-        inherit mkTrixConfig;
+        inherit mkConfig;
       }
     );
 }

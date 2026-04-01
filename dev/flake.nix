@@ -55,7 +55,7 @@
       in
       {
         devShells.default = craneLib.devShell {
-          GRAMMARS = trix.mkTrixConfig.${system} {
+          TRIX_CONFIG_JSON = trix.mkConfig.${system} {
             fish.src = tree-sitter-fish;
             typescript = {
               src = tree-sitter-typescript;
