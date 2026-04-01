@@ -1,20 +1,5 @@
 {
   "nodes": {
-    "crane": {
-      "locked": {
-        "lastModified": 1774313767,
-        "narHash": "sha256-hy0XTQND6avzGEUFrJtYBBpFa/POiiaGBr2vpU6Y9tY=",
-        "owner": "ipetkov",
-        "repo": "crane",
-        "rev": "3d9df76e29656c679c744968b17fbaf28f0e923d",
-        "type": "github"
-      },
-      "original": {
-        "owner": "ipetkov",
-        "repo": "crane",
-        "type": "github"
-      }
-    },
     "flake-utils": {
       "inputs": {
         "systems": "systems"
@@ -51,33 +36,8 @@
     },
     "root": {
       "inputs": {
-        "crane": "crane",
         "flake-utils": "flake-utils",
-        "nixpkgs": "nixpkgs",
-        "rust-overlay": "rust-overlay",
-        "tree-sitter-fish": "tree-sitter-fish",
-        "tree-sitter-typescript": "tree-sitter-typescript",
-        "treefmt-nix": "treefmt-nix"
-      }
-    },
-    "rust-overlay": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1774494762,
-        "narHash": "sha256-lt22GCJZ6qBQLgNZZl3S/RUjTLXTlEy0Fn0sqMttLxQ=",
-        "owner": "oxalica",
-        "repo": "rust-overlay",
-        "rev": "ce3b3a61ebf28670dfc8b97eb35ed9e24474a2cf",
-        "type": "github"
-      },
-      "original": {
-        "owner": "oxalica",
-        "repo": "rust-overlay",
-        "type": "github"
+        "nixpkgs": "nixpkgs"
       }
     },
     "systems": {
@@ -92,58 +52,6 @@
       "original": {
         "owner": "nix-systems",
         "repo": "default",
-        "type": "github"
-      }
-    },
-    "tree-sitter-fish": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1771759141,
-        "narHash": "sha256-n6eGMdbW1Rsn5XbszLSSSG3F8jh+loYnPEiabNY+jfk=",
-        "owner": "ram02z",
-        "repo": "tree-sitter-fish",
-        "rev": "fa2143f5d66a9eb6c007ba9173525ea7aaafe788",
-        "type": "github"
-      },
-      "original": {
-        "owner": "ram02z",
-        "repo": "tree-sitter-fish",
-        "type": "github"
-      }
-    },
-    "tree-sitter-typescript": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1738275099,
-        "narHash": "sha256-A0M6IBoY87ekSV4DfGHDU5zzFWdLjGqSyVr6VENgA+s=",
-        "owner": "tree-sitter",
-        "repo": "tree-sitter-typescript",
-        "rev": "75b3874edb2dc714fb1fd77a32013d0f8699989f",
-        "type": "github"
-      },
-      "original": {
-        "owner": "tree-sitter",
-        "repo": "tree-sitter-typescript",
-        "type": "github"
-      }
-    },
-    "treefmt-nix": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1773297127,
-        "narHash": "sha256-6E/yhXP7Oy/NbXtf1ktzmU8SdVqJQ09HC/48ebEGBpk=",
-        "owner": "numtide",
-        "repo": "treefmt-nix",
-        "rev": "71b125cd05fbfd78cab3e070b73544abe24c5016",
-        "type": "github"
-      },
-      "original": {
-        "owner": "numtide",
-        "repo": "treefmt-nix",
         "type": "github"
       }
     }
