@@ -1,10 +1,7 @@
 pub mod error;
 
 use std::{
-  borrow::Cow,
-  collections::{HashMap, HashSet},
-  fmt::Display,
-  path::{Path, PathBuf},
+  borrow::Cow, collections::{HashMap, HashSet}, ffi::OsStr, fmt::Display, path::{Path, PathBuf}
 };
 
 use quote::format_ident;
@@ -226,6 +223,12 @@ pub struct TrixConfig {
 }
 
 impl TrixConfig {
+  /// Parses environment variable `var` as a JSON trix config.
+  pub fn from_env<S: AsRef<OsStr>>(var: S) -> Result<Self> {
+    let config_json = std::env::var(var)?;
+    Ok(serde_json::from_str(&config_json)?)
+  }
+
   pub fn from_json<S: AsRef<str>>(s: S) -> Result<Self> {
     Ok(serde_json::from_str(s.as_ref())?)
   }

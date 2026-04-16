@@ -1,8 +1,8 @@
 {
-  description = "spread";
+  description = "trix-dev";
   inputs = {
     trix.url = "../.";
-    nixpkgs.follows = "trix/nixpkgs";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     flake-utils.follows = "trix/flake-utils";
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
@@ -52,16 +52,18 @@
 
         rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ../rust-toolchain.toml;
         craneLib = (crane.mkLib pkgs).overrideToolchain (_: rustToolchain);
+        grammars = {
+          fish.src = tree-sitter-fish;
+          typescript = {
+            src = tree-sitter-typescript;
+            filter = [ "typescript" ];
+          };
+        };
+        trixLib = trix.mkLib pkgs grammars;
       in
       {
         devShells.default = craneLib.devShell {
-          TRIX_CONFIG_JSON = trix.mkConfig.${system} {
-            fish.src = tree-sitter-fish;
-            typescript = {
-              src = tree-sitter-typescript;
-              filter = [ "typescript" ];
-            };
-          };
+          TRIX_CONFIG_JSON = builtins.toJSON trixLib.config;
         };
 
         formatter = treefmt.config.build.wrapper;

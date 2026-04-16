@@ -8,6 +8,8 @@ pub enum Error {
   Read(#[from] std::io::Error),
   #[error("failed to deserialize tree-sitter.json: {0:?}")]
   Deserialize(#[from] serde_json::Error),
+  #[error("failed to read env var: {0}")]
+  Var(#[from] std::env::VarError)
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
