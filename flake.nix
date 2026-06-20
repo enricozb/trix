@@ -33,7 +33,7 @@
       mkLib = pkgs: grammars: {
         config = builtins.mapAttrs (mkGrammarDrv pkgs) grammars;
         vendor = pkgs.writeShellScriptBin "trix-vendor" ''
-          ${pkgs.nu}/bin/nu ${./trix.nu} vendor "$@"
+          ${pkgs.nushell}/bin/nu ${./trix.nu} vendor "$@"
         '';
       };
     in
