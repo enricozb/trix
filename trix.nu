@@ -46,16 +46,38 @@ export def 'main install' (dir: path) {
   }
 }
 
-# Writes the grammars referenced in `trix_config` to `dir`, creating it if it
+# Writes the grammars referenced in `trix-config` to `dir`, creating it if it
 # does not exist.
-export def 'main vendor' (--dir: path, --trix_config: string) {
+#
+# `trix_config` is a JSON object mapping grammar names to `{ src, filter }`,
+# where `src` is a path to an installed grammar (the output of `trix install`).
+# For each grammar, its installed tree is copied to `<dir>/<name>`, and a
+# `trix-config.json` manifest is written to `<dir>` whose `src` fields are
+# relative to `<dir>`. The manifest can later be read by `trix-build` via
+# `TrixConfig::from_vendor_dir`.
+export def 'main vendor' (--dir: path, --trix-config: string) {
   mkdir $dir
 
-  $trix_config
-  | from json
-  | items { |name, grammar|
+  let config = ($trix_config | from json)
 
-  }
+  let manifest = (
+    $config
+    | columns
+    | reduce --fold {} { |name, acc|
+      let grammar = ($config | get $name)
+      let dest = ($dir | path join $name)
+
+      rm -rf $dest
+      cp -r $grammar.src $dest
+      # `src` is typically read-only (e.g. from the nix store); make the copy
+      # writable so it can be overwritten on a subsequent vendor.
+      chmod -R +w $dest
+
+      $acc | insert $name { src: $name, filter: ($grammar.filter? | default null) }
+    }
+  )
+
+  $manifest | to json | save --force ($dir | path join "trix-config.json")
 }
 
 def grammars () {

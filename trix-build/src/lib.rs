@@ -1,7 +1,11 @@
 pub mod error;
 
 use std::{
-  borrow::Cow, collections::{HashMap, HashSet}, ffi::OsStr, fmt::Display, path::{Path, PathBuf}
+  borrow::Cow,
+  collections::{HashMap, HashSet},
+  ffi::OsStr,
+  fmt::Display,
+  path::{Path, PathBuf},
 };
 
 use quote::format_ident;
@@ -231,6 +235,22 @@ impl TrixConfig {
 
   pub fn from_json<S: AsRef<str>>(s: S) -> Result<Self> {
     Ok(serde_json::from_str(s.as_ref())?)
+  }
+
+  /// Reads a trix config from a vendor directory produced by `trix vendor`.
+  ///
+  /// The directory must contain a `trix-config.json` manifest whose `src`
+  /// fields are paths relative to `dir`. Each source's `src` is rebased to be
+  /// absolute (i.e. joined with `dir`) so the resulting config can be passed to
+  /// [`Macros::from_config`] directly.
+  pub fn from_vendor_dir<P: AsRef<Path>>(dir: P) -> Result<Self> {
+    let dir = dir.as_ref();
+    let json = std::fs::read_to_string(dir.join("trix-config.json"))?;
+    let mut config: Self = serde_json::from_str(&json)?;
+    for source in config.sources.values_mut() {
+      source.src = dir.join(&source.src);
+    }
+    Ok(config)
   }
 }
 
