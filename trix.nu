@@ -67,11 +67,13 @@ export def 'main vendor' (--dir: path, --trix-config: string) {
       let grammar = ($config | get $name)
       let dest = ($dir | path join $name)
 
+      # `src` is typically read-only (e.g. from the nix store). Use external
+      # `cp` with `--no-preserve=mode` so the vendored copy is writable, which
+      # keeps the result usable and re-runnable (otherwise a later `rm`/`cp`
+      # over a read-only tree would fail).
+      if ($dest | path exists) { ^chmod -R u+w $dest }
       rm -rf $dest
-      cp -r $grammar.src $dest
-      # `src` is typically read-only (e.g. from the nix store); make the copy
-      # writable so it can be overwritten on a subsequent vendor.
-      chmod -R +w $dest
+      ^cp -rL --no-preserve=mode $grammar.src $dest
 
       $acc | insert $name { src: $name, filter: ($grammar.filter? | default null) }
     }
