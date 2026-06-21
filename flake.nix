@@ -30,12 +30,18 @@
           src = drv;
           inherit filter;
         };
-      mkLib = pkgs: grammars: {
-        config = builtins.mapAttrs (mkGrammarDrv pkgs) grammars;
-        vendor = pkgs.writeShellScriptBin "trix-vendor" ''
-          ${pkgs.nushell}/bin/nu ${./trix.nu} vendor "$@"
-        '';
-      };
+      mkLib =
+        pkgs: grammars:
+        let
+          config = builtins.mapAttrs (mkGrammarDrv pkgs) grammars;
+          configFile = pkgs.writeText "trix-config.json" (builtins.toJSON config);
+        in
+        {
+          inherit config;
+          vendor = pkgs.writeShellScriptBin "trix-vendor" ''
+            ${pkgs.nushell}/bin/nu ${./trix.nu} vendor --config-json "$(cat ${configFile})" "$@"
+          '';
+        };
     in
     {
       inherit mkLib;

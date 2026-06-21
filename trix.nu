@@ -49,16 +49,17 @@ export def 'main install' (dir: path) {
 # Writes the grammars referenced in `trix-config` to `dir`, creating it if it
 # does not exist.
 #
-# `trix_config` is a JSON object mapping grammar names to `{ src, filter }`,
-# where `src` is a path to an installed grammar (the output of `trix install`).
+# `config-json` is a JSON mapping grammar names to `{ src, filter }`, where
+# `src` is a path to an installed grammar (the output of `trix install`).
+#
 # For each grammar, its installed tree is copied to `<dir>/<name>`, and a
 # `trix-config.json` manifest is written to `<dir>` whose `src` fields are
 # relative to `<dir>`. The manifest can later be read by `trix-build` via
 # `TrixConfig::from_vendor_dir`.
-export def 'main vendor' (--dir: path, --trix-config: string) {
+export def 'main vendor' (--dir: path, --config-json: string) {
   mkdir $dir
 
-  let config = ($trix_config | from json)
+  let config = ($config_json | from json)
 
   let manifest = (
     $config
