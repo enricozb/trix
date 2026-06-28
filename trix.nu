@@ -13,11 +13,11 @@ export def 'main generate' (name: string) {
   }
 
   for grammar in (grammars) {
+    # TODO: It looks like `grammar.json` is also a valid file.
+    #       See https://tree-sitter.github.io/tree-sitter/cli/generate.html
     let grammar_js_path = $grammar.path | path join "grammar.js"
-    let parser_c_path = $grammar.path | path join "src/parser.c"
-    if ($grammar_js_path | path exists) and not ($parser_c_path | path exists) {
-      ^tree-sitter generate $grammar_js_path
-    }
+
+    ^tree-sitter generate $grammar_js_path
   }
 }
 

@@ -191,8 +191,5 @@ fn main() {
 }
 ```
 
-A few notes about `mkConfig`:
-- if `tree-sitter.json` does not exist, we fake a minimal one with `name` and
-  `metadata` fields.
-- if `grammar.js` doesn't exist for a grammar, we assume `tree-sitter generate`
-  has already been executed for it.
+If `tree-sitter.json` does not exist, `mkConfig` fakes a minimal one with
+`name` and `metadata` fields.
