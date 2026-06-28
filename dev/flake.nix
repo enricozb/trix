@@ -57,6 +57,10 @@
           typescript = {
             src = tree-sitter-typescript;
             filter = [ "typescript" ];
+            # tree-sitter-typescript's grammar.js requires
+            # `tree-sitter-javascript/grammar`, so its npm deps must be present
+            # for `tree-sitter generate`.
+            npmDepsHash = "sha256-C377bZ1ikMpwXD2LvEp01/a37GOh5FT0fUj8DKdTYyw=";
           };
         };
         trixLib = trix.mkLib pkgs grammars;

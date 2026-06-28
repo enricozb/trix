@@ -193,3 +193,37 @@ fn main() {
 
 If `tree-sitter.json` does not exist, `mkConfig` fakes a minimal one with
 `name` and `metadata` fields.
+
+### Grammars with npm dependencies
+
+Some grammars' `grammar.js` files `require(...)` other tree-sitter grammars.
+For example, `tree-sitter-cpp` does `require('tree-sitter-c/grammar')` and
+`tree-sitter-typescript` does `require('tree-sitter-javascript/grammar')`.
+These grammars need their npm dependencies installed before `tree-sitter
+generate` can run.
+
+Since the build is hermetic (no network access), set an `npmDepsHash` on the
+grammar. trix then uses `fetchNpmDeps` (the same fixed-output-derivation
+machinery as `buildNpmPackage`) to fetch the dependency tarballs into an
+offline npm cache and populate `node_modules` before generating the parser:
+```nix
+trix.mkLib pkgs {
+  cpp = {
+    src = tree-sitter-cpp;
+    npmDepsHash = "sha256-...";
+  };
+  typescript = {
+    src = tree-sitter-typescript;
+    filter = [ "typescript" ];
+    npmDepsHash = "sha256-...";
+  };
+}
+```
+This needs only a single hash per grammar, works directly with the upstream
+`package-lock.json`, and requires no checked-in generated files. Install
+scripts are skipped (`--ignore-scripts`) since only the dependencies'
+`grammar.js` files are needed — not native bindings or downloaded binaries.
+
+To find the hash, set `npmDepsHash = pkgs.lib.fakeHash`, build, and copy the
+`got:` value from the resulting hash-mismatch error. The hash only needs
+updating when the grammar's `package-lock.json` changes.
